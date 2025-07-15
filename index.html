@@ -3,16 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Diagram Demo</title>
+  <title>Flowgen - Diagram Demo</title>
   <style>
     body {
       margin: 0;
       font-family: "Segoe UI", Roboto, sans-serif;
       background: #f0f2f5;
     }
+    header {
+      background: #4f46e5;
+      color: white;
+      display: flex;
+      align-items: center;
+      padding: 10px 20px;
+      position: fixed;
+      width: 100%;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+    header svg {
+      height: 32px;
+      width: 32px;
+      margin-right: 10px;
+      flex-shrink: 0;
+    }
+    header h1 {
+      font-size: 22px;
+      margin: 0;
+      font-weight: 600;
+    }
+    .content {
+      margin-top: 60px; /* offset for header */
+    }
     .screen {
       display: none;
-      height: 100vh;
+      height: calc(100vh - 60px);
     }
     .active {
       display: block;
@@ -51,7 +77,7 @@
     }
     .editor-layout {
       display: flex;
-      height: 100vh;
+      height: calc(100vh - 60px);
     }
     .sidebar {
       width: 250px;
@@ -73,6 +99,10 @@
     }
     .history-item:hover {
       background: #f3f4f6;
+    }
+    .clear-btn {
+      background: #ef4444;
+      margin: 10px 20px;
     }
     .main {
       flex: 1;
@@ -110,9 +140,41 @@
       border-radius: 10px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.1);
     }
+    .attachment-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f3f4f6;
+      padding: 10px;
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+    .delete-btn {
+      background: #ef4444;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 4px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .delete-btn:hover {
+      background: #dc2626;
+    }
   </style>
 </head>
 <body>
+
+<header>
+  <!-- Example SVG logo for Flowgen -->
+  <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="10" stroke="white" stroke-width="2" fill="#4338ca"/>
+    <path d="M8 12h8M12 8v8" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <h1>Flowgen</h1>
+</header>
+
+<div class="content">
 
   <!-- Login Screen -->
   <div id="login-screen" class="screen active">
@@ -152,18 +214,27 @@
   <!-- Editor Screen -->
   <div id="editor-screen" class="screen editor-layout">
     <div class="sidebar">
-      <h3>History</h3>
+      <h3>Search History</h3>
+      <button class="clear-btn" onclick="clearHistory()">Clear History</button>
       <div id="history-list"></div>
     </div>
     <div class="main">
       <div class="toolbar">
         <input id="search-history" placeholder="Search history...">
-        <button onclick="usePredefinedPrompt()">Predefined Prompt</button>
       </div>
       <div class="canvas-area">
         <div class="whiteboard">
           <textarea id="prompt-input" rows="3" placeholder="Describe your diagram..."></textarea>
-          <input type="file" id="file-input" />
+          <select id="predefined-select" onchange="applyPredefined()">
+            <option value="">-- Choose a predefined prompt --</option>
+            <option>AWS architecture with EC2, S3 and VPC</option>
+            <option>GCP data pipeline with PubSub and BigQuery</option>
+            <option>Connectors between CRM and ERP</option>
+            <option>VPC with subnets and routing tables</option>
+            <option>Azure Kubernetes Service deployment flow</option>
+          </select>
+          <input type="file" id="file-input" onchange="handleAttachment()" />
+          <div id="attachment-info"></div>
           <button onclick="generateDiagram()">Generate Diagram</button>
           <div id="diagram-area" style="margin-top: 20px;"></div>
           <button onclick="exportDiagram()" style="margin-top: 20px;">Export to Office 365</button>
@@ -172,81 +243,104 @@
     </div>
   </div>
 
-  <script>
-    const history = [];
+</div>
 
-    function showScreen(id) {
-      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      document.getElementById(id).classList.add('active');
-    }
+<script>
+  let history = [];
+  let currentAttachment = null;
 
-    function generateDiagram() {
-      const prompt = document.getElementById('prompt-input').value || "Sample Diagram";
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
 
-      // Save to history
+  function generateDiagram() {
+    const prompt = document.getElementById('prompt-input').value || "Sample Diagram";
+
+    if (!history.includes(prompt)) {
       history.push(prompt);
-      renderHistory();
+    }
+    renderHistory();
 
-      const svg = `
-        <svg width="400" height="200" xmlns="http://www.w3.org/2000/svg">
-          <rect x="50" y="50" width="300" height="100" fill="#4f46e5" rx="10" />
-          <text x="200" y="120" font-size="18" text-anchor="middle" fill="#fff">
-            ${prompt}
-          </text>
-        </svg>
+    const svg = `
+      <svg width="600" height="300" xmlns="http://www.w3.org/2000/svg">
+        <rect x="50" y="50" width="500" height="200" fill="#4f46e5" rx="10" />
+        <text x="300" y="150" font-size="20" text-anchor="middle" fill="#fff">
+          ${prompt}
+        </text>
+      </svg>
+    `;
+
+    document.getElementById('diagram-area').innerHTML = svg;
+
+    if (currentAttachment) {
+      alert("Attachment included: " + currentAttachment.name);
+    }
+  }
+
+  function renderHistory() {
+    const list = document.getElementById('history-list');
+    list.innerHTML = '';
+    history.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'history-item';
+      div.textContent = item;
+      div.onclick = () => {
+        document.getElementById('prompt-input').value = item;
+      };
+      list.appendChild(div);
+    });
+  }
+
+  function clearHistory() {
+    history = [];
+    renderHistory();
+    alert("Search history cleared!");
+  }
+
+  function applyPredefined() {
+    const dropdown = document.getElementById('predefined-select');
+    const selected = dropdown.value;
+    if (selected) {
+      document.getElementById('prompt-input').value = selected;
+    }
+  }
+
+  function handleAttachment() {
+    const fileInput = document.getElementById('file-input');
+    if (fileInput.files.length > 0) {
+      currentAttachment = fileInput.files[0];
+      document.getElementById('attachment-info').innerHTML = `
+        <div class="attachment-row">
+          <span>${currentAttachment.name}</span>
+          <button class="delete-btn" onclick="deleteAttachment()">🗑️ Delete</button>
+        </div>
       `;
+    }
+  }
 
-      document.getElementById('diagram-area').innerHTML = svg;
+  function deleteAttachment() {
+    currentAttachment = null;
+    document.getElementById('file-input').value = "";
+    document.getElementById('attachment-info').innerHTML = "";
+  }
 
-      // Optional: send attachment
-      const fileInput = document.getElementById('file-input');
-      if (fileInput.files.length > 0) {
-        const file = fileInput.files[0];
-        alert("Attachment uploaded: " + file.name);
-      }
+  function exportDiagram() {
+    const svg = document.getElementById('diagram-area').innerHTML;
+    if (!svg) {
+      alert("Generate a diagram first!");
+      return;
     }
 
-    function renderHistory() {
-      const list = document.getElementById('history-list');
-      list.innerHTML = '';
-      history.forEach((item, idx) => {
-        const div = document.createElement('div');
-        div.className = 'history-item';
-        div.textContent = item;
-        div.onclick = () => {
-          document.getElementById('prompt-input').value = item;
-        };
-        list.appendChild(div);
-      });
-    }
+    const blob = new Blob([svg], {type: 'image/svg+xml'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'diagram.svg';
+    link.click();
 
-    function usePredefinedPrompt() {
-      const samples = [
-        "Flowchart of user registration",
-        "Network diagram of office layout",
-        "ER diagram for e-commerce"
-      ];
-      const chosen = samples[Math.floor(Math.random() * samples.length)];
-      document.getElementById('prompt-input').value = chosen;
-    }
-
-    function exportDiagram() {
-      const svg = document.getElementById('diagram-area').innerHTML;
-      if (!svg) {
-        alert("Generate a diagram first!");
-        return;
-      }
-
-      // Dummy export: download SVG file
-      const blob = new Blob([svg], {type: 'image/svg+xml'});
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'diagram.svg';
-      link.click();
-
-      alert("Diagram exported to Office 365 (dummy flow)!");
-    }
-  </script>
+    alert("Diagram exported to Office 365 (dummy flow)!");
+  }
+</script>
 
 </body>
 </html>
